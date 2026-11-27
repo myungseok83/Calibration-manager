@@ -48,8 +48,18 @@ jobs:
           elif [ -f Code.js ]; then cp ../gas/Code.js Code.js
           else echo "::error::서버 코드 파일이 여러 개라 어느 것을 바꿀지 모름: ${F[*]}"; exit 1; fi
           clasp push -f
-          clasp deployments || true
+          DEPS=$(clasp deployments || true); echo "$DEPS"
           # 배포 ID: 공백 제거, 웹앱 URL 전체를 넣었어도 /s/ 와 /exec 사이 값만 사용
           DID=$(echo "$GAS_DEPLOYMENT_ID" | tr -d '[:space:]' | sed -E 's#.*/s/([^/]+).*#\1#')
+          # Secret의 배포 ID가 이 프로젝트에 없으면: 웹앱 배포(@버전)가 1개뿐일 때 그것을 사용
+          if ! echo "$DEPS" | grep -q -- "$DID"; then
+            mapfile -t V < <(echo "$DEPS" | grep -E '^- AKfy[^ ]+ @[0-9]+' | awk '{print $2}')
+            if [ ${#V[@]} -eq 1 ]; then
+              echo "::warning::GAS_DEPLOYMENT_ID가 이 프로젝트의 배포가 아니어서, 유일한 웹앱 배포(${V[0]:0:12}…)를 갱신합니다. Secret을 웹앱 URL로 고쳐두세요."
+              DID="${V[0]}"
+            else
+              echo "::error::GAS_DEPLOYMENT_ID가 이 프로젝트의 배포 ID가 아닙니다. Apps Script → 배포 → 배포 관리의 웹앱 URL을 넣어주세요."; exit 1
+            fi
+          fi
           VER=$(grep -m1 -o 'VERSION: *V[0-9.]*' ../gas/Code.js | sed 's/VERSION: *//')
           clasp deploy -i "$DID" -d "auto ${VER:-update} $(date +%F)"

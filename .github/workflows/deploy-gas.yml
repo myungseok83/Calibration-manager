@@ -35,8 +35,12 @@ jobs:
           set -e
           npm i -g @google/clasp@2.4.2
           echo "$CLASPRC_JSON" > ~/.clasprc.json
+          # 스크립트 ID: 공백 제거, 편집기 주소(…/projects/ID/edit)를 넣었어도 ID만 사용
+          SID=$(echo "$GAS_SCRIPT_ID" | tr -d '[:space:]' | sed -E 's#.*/projects/([^/]+).*#\1#')
+          case "$SID" in AKfy*) echo "::error::GAS_SCRIPT_ID에 배포 ID(AKfy…)가 들어 있습니다. 프로젝트 설정의 '스크립트 ID'를 넣어주세요."; exit 1;; esac
+          echo "스크립트 ID 길이: ${#SID}자, 앞 4자리: ${SID:0:4}"
           mkdir build && cd build
-          clasp clone "$GAS_SCRIPT_ID"          # 현재 프로젝트(appsscript.json 포함) 그대로 받아오기
+          clasp clone "$SID" || { echo "::error::스크립트를 못 찾음 — ① 스크립트 ID 값 ② CLASPRC_JSON과 같은 구글 계정 소유인지 확인"; exit 1; }          # 현재 프로젝트(appsscript.json 포함) 그대로 받아오기
           ls -la
           # 서버 코드 파일이 1개면 그 파일을 gas/Code.js 로 교체 (파일명 유지)
           mapfile -t F < <(ls *.js *.gs 2>/dev/null || true)
